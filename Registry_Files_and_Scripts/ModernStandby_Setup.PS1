@@ -19,12 +19,9 @@ move $Home\Desktop\Stop_IntelPepTraceLoggingProvider.bat C:\Windows\System32 -Fo
 #cd .\KITS
 #Copy-Item -Path ".\ADK" -Destination "$Home\Desktop" -Recurse -Force
 
-
 #Install ADK with all modules
 #cd $Home\Desktop\ADK
 #.\adksetup.exe /features + /ceip off
-
-
 
 # Automatically detect OS build and fetch matching ADK
 $osBuild = (Get-CimInstance Win32_OperatingSystem).BuildNumber
@@ -32,26 +29,26 @@ Write-Host "Detected OS Build: $osBuild"
 
 $osVettingRoot = "\\wosext3.amr.corp.intel.com\BSP\OS-Vetting"
 $matchingFolder = Get-ChildItem -Directory $osVettingRoot |
-    Where-Object { $_.Name -match $osBuild } |
-    Sort-Object Name -Descending |
-    Select-Object -First 1
+    Where-Object { $_.Name -match $osBuild } |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
 
 if ($matchingFolder) {
-    $adkSourcePath = Join-Path $matchingFolder.FullName "KITS\ADK"
-    $adkSetupPath = Join-Path $adkSourcePath "adksetup.exe"
+    $adkSourcePath = Join-Path $matchingFolder.FullName "KITS\ADK"
+    $adkSetupPath = Join-Path $adkSourcePath "adksetup.exe"
 
-    if (Test-Path $adkSetupPath) {
-        $adkDestPath = "$Home\Desktop\ADK"
-        Copy-Item -Path $adkSourcePath -Destination $adkDestPath -Recurse -Force
-        Write-Host "ADK files copied from: $adkSourcePath"
+    if (Test-Path $adkSetupPath) {
+        $adkDestPath = "$Home\Desktop\ADK"
+        Copy-Item -Path $adkSourcePath -Destination $adkDestPath -Recurse -Force
+        Write-Host "ADK files copied from: $adkSourcePath"
 
-        # Install ADK
-        & "$adkDestPath\adksetup.exe" /features + /ceip off
-    } else {
-        Write-Host "ADK setup not found in: $adkSourcePath"
-    }
+        # Install ADK
+        & "$adkDestPath\adksetup.exe" /features + /ceip off
+    } else {
+        Write-Host "ADK setup not found in: $adkSourcePath"
+    }
 } else {
-    Write-Host "No matching OS-Vetting folder found for build $osBuild"
+    Write-Host "No matching OS-Vetting folder found for build $osBuild"
 }
 
 

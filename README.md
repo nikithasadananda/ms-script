@@ -57,7 +57,7 @@ This PowerShell script automates the process of identifying the current Windows 
 
 ## 📁 Script Location
 
-[ModernStandby_Setup.PS1](https://github.com/nikithasadananda/ms-script/blob/main/Registry_Files_and_Scripts/ModernStandby_Setup.PS1) ADK folder on a network share.
+[ModernStandby_Setup.PS1](https://github.com/nikithasadananda/ms-script/blob/main/Registry_Files_and_Scripts/ModernStandby_Setup.PS1 ADK folder on a network share.
 - Copies the appropriate ADK files to the user's desktop.
 - Installs the ADK with predefined options.
 

@@ -54,3 +54,18 @@ Parses the Sleep Study report for software (`SW:`) and hardware (`HW:`) efficien
 ```powershell
 $usbDeviceName = "Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft)"
 
+# Modern Standby Setup Script
+
+This PowerShell script automates the process of identifying the current Windows OS build, locating the corresponding vetted ADK (Assessment and Deployment Kit) files, copying them locally, and initiating the ADK installation.
+
+## 📁 Script Location
+
+[ModernStandby_Setup.PS1](https://github.com/nikithasadananda/ms-script/blob/main/Registry_Files_and_Scripts/tted ADK folder on a network share.
+- Copies the appropriate ADK files to the user's desktop.
+- Installs the ADK with predefined options.
+
+## 📌 Prerequisites
+
+- PowerShell 5.1 or later
+- Network access to the vetting share:
+  ```

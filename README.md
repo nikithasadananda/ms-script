@@ -51,9 +51,6 @@ Parses the Sleep Study report for software (`SW:`) and hardware (`HW:`) efficien
 1. Open PowerShell as Administrator.
 2. Run the script.
 
-```powershell
-$usbDeviceName = "Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft)"
-
 # Modern Standby Setup Script
 
 This PowerShell script automates the process of identifying the current Windows OS build, locating the corresponding vetted ADK (Assessment and Deployment Kit) files, copying them locally, and initiating the ADK installation.
@@ -67,5 +64,32 @@ This PowerShell script automates the process of identifying the current Windows 
 ## 📌 Prerequisites
 
 - PowerShell 5.1 or later
-- Network access to the vetting share:
+- Network access to the vetting share: \wosext3.amr.corp.intel.com\BSP\OS-Vetting
   ```
+- Sufficient permissions to copy files and install software.
+
+## 🚀 Usage
+
+1. Open PowerShell as Administrator.
+2. Run the script:
+ ```powershell
+ .\ModernStandby_Setup.PS1
+
+🧩 Script Breakdown
+Get-OSBuild
+Retrieves the current Windows OS build number.
+
+Find-MatchingVettingFolder
+Searches the vetting root directory for a folder that matches the OS build number.
+
+Copy-ADKFiles
+Copies the ADK files from the vetted folder to the user's desktop.
+
+Install-ADK
+Runs the ADK installer with specific options.
+
+📂 Output
+ADK files will be copied to:
+
+%USERPROFILE%\Desktop\ADK
+If a matching vetted folder or ADK setup is not found, the script will notify the user.

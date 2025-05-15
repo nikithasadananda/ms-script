@@ -1,7 +1,7 @@
 # ms-script
  Modern standby scripts
 
-# 💤 USB Sleep Study Automation Script
+# 💤 PCH and IOE Sleep Study Automation Script
 
 This PowerShell script automates the process of disabling a USB device, putting the system into sleep mode, setting a wake timer, generating a sleep study report, and analyzing the results. It's particularly useful for diagnosing sleep-related issues on Windows systems.
 
@@ -11,7 +11,7 @@ This PowerShell script automates the process of disabling a USB device, putting 
 
 - Disable a specific USB device by name
 - Start Windows Performance Recorder (WPR) tracing
-- Set a scheduled wake timer (default: 10 minutes)
+- Set a scheduled wake timer (default: 20 minutes)
 - Put the system into sleep mode
 - Generate a verbose Sleep Study report
 - Analyze Sleep Study results for software and hardware efficiency

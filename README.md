@@ -30,7 +30,7 @@ This PowerShell script automates the process of disabling a USB device, putting 
 ## 🧩 Script Functions
 
 ### `Disable-USBDevice`
-Disables a USB device by its name using `Get-PnpDevice` and `Disable-PnpDevice`.
+Disables a USB device by its name using 'pnputil'.
 
 ### `Put-SystemToSleep`
 Disables hibernation and puts the system into sleep using `rundll32`.

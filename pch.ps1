@@ -4,72 +4,46 @@ function Disable-USBDevice {
     pnputil /disable-device "PCI\VEN_8086&DEV_A831&SUBSYS_72708086&REV_10\3&11583659&0&68"
 }
 
+# Function to set a wake timer for 20 minutes using schtasks
+function Set-WakeTimer {
+    Write-Output "Setting wake timer for 20 minutes using schtasks.exe..."
+
+    $taskName = "WakeUpTask"
+    $time = (Get-Date).AddMinutes(20).ToString("HH:mm")
+
+    # Delete existing task if it exists
+    schtasks /Delete /TN $taskName /F > $null 2>&1
+
+    # Create a new task that wakes the system
+    schtasks /Create /TN $taskName /TR "cmd.exe /c exit" /SC ONCE /ST $time /RL HIGHEST /RU SYSTEM /F
+
+    # Enable WakeToRun using PowerShell
+    $task = Get-ScheduledTask -TaskName $taskName
+    $task.Settings.WakeToRun = $true
+    Set-ScheduledTask -TaskName $taskName -Settings $task.Settings
+}
+
 # Function to put system to sleep
 function Put-SystemToSleep {
     Write-Output "Putting system into sleep state..."
     try {
+        powercfg -hibernate on
         rundll32.exe powrprof.dll,SetSuspendState Sleep
     } catch {
         Write-Output "Failed to put system to sleep. Error: $_"
     }
 }
 
-# Function to set a wake timer
-function Set-WakeTimer {
-    Write-Output "Setting wake timer..."
-    $time = (Get-Date).AddMinutes(10)
-    $taskName = "WakeUpTask"
-    if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-    }
-    $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c exit"
-    $trigger = New-ScheduledTaskTrigger -Once -At $time
-    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest
-}
-
-# Function to generate Sleep Study report
+# Function to generate verbose Sleep Study report in System32
 function Generate-SleepStudyReport {
-    Write-Output "Generating verbose sleep study report..."
-    $reportPath = "C:\SleepStudyLogs"
-    if (-not (Test-Path $reportPath)) {
-        New-Item -ItemType Directory -Path $reportPath | Out-Null
-    }
-    try {
-        powercfg /spr /output "$reportPath\sleepstudy_report.html"
-    } catch {
-        Write-Output "Failed to generate sleep study report. Error: $_"
-    }
-}
+    Write-Output "Generating verbose Sleep Study report in System32..."
+    $reportPath = "C:\Windows\System32\sleepstudy_report.html"
+    if (Test-Path $reportPath) { Remove-Item $reportPath -Force }
 
-# Function to analyze Sleep Study report
-function Check-SleepStudy {
-    Write-Output "Checking Sleep Study report..."
-    $ResultFile = "C:\SleepStudyLogs\sleepstudy_report.html"
-    $MatchWords = "SW:", "HW:"
-    foreach ($MatchWord in $MatchWords) {
-        $Drips = Get-Content $ResultFile | Select-String $MatchWord
-        if (-not $Drips) {
-            Write-Output "$MatchWord : SleepStudy did not generate valid results !!!"
-        } else {
-            foreach ($Drip in $Drips) {
-                $Result = $Drip.ToString().Trim()
-                $parts = $Result.Split(":")
-                if ($parts.Count -ge 2 -and [float]::TryParse($parts[1].Trim(), [ref]$null)) {
-                    $Value = [float]$parts[1].Trim()
-                    if ($MatchWord -eq "SW:" -and $Value -lt 90.00) {
-                        Write-Output "`t $MatchWord : $Result ( less than 90% )"
-                    } elseif ($MatchWord -eq "SW:" -and $Value -ge 90.00) {
-                        Write-Output "`t $MatchWord : $Result ( good )"
-                    } elseif ($MatchWord -eq "HW:" -and $Value -ne 0.00) {
-                        Write-Output "`t $MatchWord : $Result ( blockers )"
-                    } else {
-                        Write-Output "`t $MatchWord : $Result ( good )"
-                    }
-                } else {
-                    Write-Output "`t $MatchWord : Skipped invalid line: $Result"
-                }
-            }
-        }
+    try {
+        powercfg /spr /output $reportPath
+    } catch {
+        Write-Output "Failed to generate Sleep Study report. Error: $_"
     }
 }
 
@@ -78,6 +52,8 @@ Disable-USBDevice
 
 try {
     Write-Output "Starting WPR tracing..."
+    $etlPath = "C:\Windows\System32\power.etl"
+    if (Test-Path $etlPath) { Remove-Item $etlPath -Force }
     wpr -start power
 
     Write-Output "Setting wake timer..."
@@ -86,23 +62,15 @@ try {
     Write-Output "Putting system into sleep state..."
     Put-SystemToSleep
 
-    # Wait for system to wake up
-    Start-Sleep -Seconds 660
+    # Wait for system to wake up (20 minutes)
+    Start-Sleep -Seconds 1200
 
-    Write-Output "Waking up and stopping WPR tracing..."
-    wpr -stop power.etl
-
-    $logPath = "C:\SleepStudyLogs"
-    if (-not (Test-Path $logPath)) {
-        New-Item -ItemType Directory -Path $logPath | Out-Null
-    }
-
-    Move-Item -Path "power.etl" -Destination "$logPath\power.etl" -Force
+    Write-Output "Stopping WPR tracing and saving to System32..."
+    wpr -stop $etlPath
 
     Generate-SleepStudyReport
-    Check-SleepStudy
 
-    Write-Output "Sleep study report and trace saved to $logPath"
+    Write-Output " Sleep Study report and power trace saved to C:\Windows\System32"
 } catch {
-    Write-Output "An error occurred: $_"
+    Write-Output " An error occurred: $_"
 }

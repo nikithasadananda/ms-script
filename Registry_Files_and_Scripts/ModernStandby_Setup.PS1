@@ -4,7 +4,7 @@ copy "\\wosext3.amr.corp.intel.com\BSP\Tools\ModernStandby\2x2_Execution_Tools\M
 copy "\\wosext3.amr.corp.intel.com\BSP\Tools\ModernStandby\2x2_Execution_Tools\Modern_Standby_Boot_Trace\Stop_IntelPepTraceLoggingProvider.bat" $Home\Desktop -Force
 Copy-Item -Path "\\wosext3.amr.corp.intel.com\BSP\Execution\SCA\MFC_golden\Security\SCA" -Destination "$Home\Desktop" -Recurse -Force
 Copy-Item -Path "\\wosext3.amr.corp.intel.com\Users\nsadanax\TOOLS\Registry_Files_and_Scripts\ModernStandby_RS_and_AH_Config" -Destination "$Home\Desktop" -Recurse -Force
-Copy-Item -path "\\wosext3.amr.corp.intel.com\BSP\Tools\ModernStandby\2x2_Execution_Tools\Modern_Standby_Boot_Trace" -Destination "$Home\Desktop" -Recurse -Force
+
 
 #Move necessary files into System 32
 move $Home\Desktop\private-intelpep-trace.wprp C:\Windows\System32 -Force

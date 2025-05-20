@@ -3,7 +3,7 @@ copy "\\wosext3.amr.corp.intel.com\BSP\Tools\ModernStandby\2x2_Execution_Tools\p
 copy "\\wosext3.amr.corp.intel.com\BSP\Tools\ModernStandby\2x2_Execution_Tools\Modern_Standby_Boot_Trace\Start_IntelPepTraceLoggingProvider.bat" $Home\Desktop -Force
 copy "\\wosext3.amr.corp.intel.com\BSP\Tools\ModernStandby\2x2_Execution_Tools\Modern_Standby_Boot_Trace\Stop_IntelPepTraceLoggingProvider.bat" $Home\Desktop -Force
 Copy-Item -Path "\\wosext3.amr.corp.intel.com\BSP\Execution\SCA\MFC_golden\Security\SCA" -Destination "$Home\Desktop" -Recurse -Force
-Copy-Item -Path "\\wosext3\BSP\Execution\SCA\MFC_golden\Security\SCA\Registry_Files_and_Scripts\ModernStandby_RS_and_AH_Config" -Destination "$Home\Desktop" -Recurse -Force
+Copy-Item -Path "\\wosext3.amr.corp.intel.com\BSP\Execution\SCA\MFC_golden\Security\SCA\Registry_Files_and_Scripts\ModernStandby_RS_and_AH_Config" -Destination "$Home\Desktop" -Recurse -Force
 
 
 #Move necessary files into System 32

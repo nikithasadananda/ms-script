@@ -93,3 +93,52 @@ ADK files will be copied to:
 
 %USERPROFILE%\Desktop\ADK
 If a matching vetted folder or ADK setup is not found, the script will notify the user.
+
+
+
+# 🔧 IntelPEP_POC Automation Scripts
+
+This repository contains PowerShell scripts to automate the integration of the `intelpep.sys` driver into Windows builds for various platforms.
+
+## 📁 Folder Structure
+
+## 🚀 Workflow Overview
+
+### `Intelpep.ps1`
+- Copies `fre` and `Changing_Binaries` folders from a network path to the Desktop.
+- Replaces `intelpep.sys` with the latest version from DriverStore (for non-PTLH-MS platforms).
+- Sets debugger settings and runs `disable.cmd`.
+- Schedules `SecondPart1.ps1` to run after reboot.
+
+### `SecondPart1.ps1`
+- Enables kernel debugging.
+- Schedules `SecondPart2.ps1` to run at next startup.
+- Reboots the system.
+
+### `SecondPart2.ps1`
+- Enables test signing, disables integrity checks, and enables advanced boot options.
+- Uses `sfpcopy_new.exe` and `sfpcopy.exe` to copy `intelpep.sys`.
+- Verifies the file copy.
+- Disables debugging and removes scheduled tasks.
+- Performs a final reboot.
+
+## 🧪 Usage Instructions
+
+> ⚠️ **Run all scripts as Administrator**
+
+1. Place all scripts (`Intelpep.ps1`, `SecondPart1.ps1`, `SecondPart2.ps1`) on your **Desktop**.
+2. Open **PowerShell as Administrator**.
+3. Run the main script:
+
+```powershell
+& "$env:USERPROFILE\Desktop\Intelpep.ps1"
+
+4. The rest of the process is automated:
+The system will reboot multiple times.
+SecondPart1.ps1 and SecondPart2.ps1 will run automatically via scheduled tasks.
+All actions are logged.
+
+📝 Logging
+All steps are logged to:
+
+%USERPROFILE%\Desktop\IntelPep_Integration_Log.txt

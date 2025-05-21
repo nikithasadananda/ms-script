@@ -1,8 +1,9 @@
 # === CONFIGURATION ===
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $logFile = Join-Path $desktopPath "IntelPep_Integration_Log.txt"
-$secondScriptPath = Join-Path $desktopPath "SecondPart.ps1"
-$taskName = "IntelPep_SecondPart"
+$secondPart1Path = Join-Path $desktopPath "SecondPart1.ps1"
+$secondPart2Path = Join-Path $desktopPath "SecondPart2.ps1"
+$taskName1 = "IntelPep_SecondPart1"
 
 function Log {
     param([string]$message)
@@ -47,25 +48,50 @@ Log "Running disable.cmd..."
 Start-Process "cmd.exe" -ArgumentList "/c C:\disable.cmd" -Wait
 Log "disable.cmd completed."
 
-# === STEP 5: CREATE SECOND PART SCRIPT ===
-$secondScript = @"
-`$logFile = '$logFile'
+# === STEP 5: CREATE SecondPart1.ps1 ===
+$secondPart1Script = @"
+`$desktopPath = [Environment]::GetFolderPath(\"Desktop\")
+`$logFile = Join-Path `$desktopPath \"IntelPep_Integration_Log.txt\"
+`$secondScriptPath = Join-Path `$desktopPath \"SecondPart2.ps1\"
+`$taskName2 = \"IntelPep_SecondPart2\"
+
 function Log {
     param([string]`$message)
     `$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Add-Content -Path `$logFile -Value \"`$timestamp - `$message\"
 }
 
-Log \"Running second part of integration...\"
+Log \"Running SecondPart1.ps1...\"
 
 bcdedit /debug on
 Log \"Debugging enabled.\"
 
+# Schedule SecondPart2.ps1 to run at next startup
+`$action2 = New-ScheduledTaskAction -Execute \"powershell.exe\" -Argument \"-ExecutionPolicy Bypass -File `\"`$secondScriptPath`\"\"
+`$trigger2 = New-ScheduledTaskTrigger -AtStartup
+Register-ScheduledTask -TaskName `$taskName2 -Action `$action2 -Trigger `$trigger2 -RunLevel Highest -Force
+Log \"Scheduled task '`$taskName2' created.\"
+
+# Reboot the system
+Log \"Rebooting system to continue integration...\"
 Restart-Computer -Force
+"@
+$secondPart1Script | Out-File -FilePath $secondPart1Path -Encoding UTF8
+Log "SecondPart1.ps1 created."
 
-Start-Sleep -Seconds 10
+# === STEP 6: CREATE SecondPart2.ps1 ===
+$secondPart2Script = @"
+`$desktopPath = [Environment]::GetFolderPath(\"Desktop\")
+`$logFile = Join-Path `$desktopPath \"IntelPep_Integration_Log.txt\"
 
-Log \"Enabling test signing, no integrity checks, and advanced boot options...\"
+function Log {
+    param([string]`$message)
+    `$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path `$logFile -Value \"`$timestamp - `$message\"
+}
+
+Log \"Running SecondPart2.ps1...\"
+
 bcdedit -set testsigning on
 Log \"Test signing enabled.\"
 
@@ -81,6 +107,11 @@ Log \"sfpcopy_new.exe completed.\"
 Start-Process \"sfpcopy.exe\" -ArgumentList \"intelpep.sys C:\windows\system32\drivers\intelpep.sys\" -Wait
 Log \"sfpcopy.exe completed.\"
 
+Log \"Rebooting system after copy...\"
+Restart-Computer -Force
+
+Start-Sleep -Seconds 10
+
 Log \"Verifying intelpep.sys is copied...\"
 if (Test-Path \"C:\windows\system32\drivers\intelpep.sys\") {
     Log \"intelpep.sys successfully copied to system32\\drivers.\"
@@ -88,28 +119,26 @@ if (Test-Path \"C:\windows\system32\drivers\intelpep.sys\") {
     Log \"intelpep.sys not found in system32\\drivers.\"
 }
 
-Log \"Disabling debugging...\"
 bcdedit /debug off
 Log \"Debugging disabled.\"
 
-Log \"Cleaning up scheduled task...\"
-Unregister-ScheduledTask -TaskName \"$taskName\" -Confirm:\$false
-Log \"Scheduled task removed.\"
+Unregister-ScheduledTask -TaskName \"IntelPep_SecondPart1\" -Confirm:\$false
+Unregister-ScheduledTask -TaskName \"IntelPep_SecondPart2\" -Confirm:\$false
+Log \"Scheduled tasks removed.\"
 
 Log \"Final rebooting system...\"
 Restart-Computer -Force
 "@
+$secondPart2Script | Out-File -FilePath $secondPart2Path -Encoding UTF8
+Log "SecondPart2.ps1 created."
 
-$secondScript | Out-File -FilePath $secondScriptPath -Encoding UTF8
-Log "Second part script created."
+# === STEP 7: SCHEDULE SecondPart1.ps1 ===
+Log "Creating scheduled task for SecondPart1.ps1..."
+$action1 = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$secondPart1Path`""
+$trigger1 = New-ScheduledTaskTrigger -AtStartup
+Register-ScheduledTask -TaskName $taskName1 -Action $action1 -Trigger $trigger1 -RunLevel Highest -Force
+Log "Scheduled task '$taskName1' created."
 
-# === STEP 6: SCHEDULE TASK TO RUN ON STARTUP ===
-Log "Creating scheduled task to run second part after reboot..."
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$secondScriptPath`""
-$trigger = New-ScheduledTaskTrigger -AtStartup
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -RunLevel Highest -Force
-Log "Scheduled task created."
-
-# === STEP 7: FIRST REBOOT ===
-Log "Rebooting system to continue integration..."
+# === STEP 8: FIRST REBOOT ===
+Log "Rebooting system to begin integration..."
 Restart-Computer -Force

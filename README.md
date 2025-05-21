@@ -70,29 +70,29 @@ This PowerShell script automates the process of identifying the current Windows 
 
 ## 🚀 Usage
 
-1. Open PowerShell as Administrator.
-2. Run the script:
- ```powershell
- .\ModernStandby_Setup.PS1
-
-🧩 Script Breakdown
-Get-OSBuild
-Retrieves the current Windows OS build number.
-
-Find-MatchingVettingFolder
-Searches the vetting root directory for a folder that matches the OS build number.
-
-Copy-ADKFiles
-Copies the ADK files from the vetted folder to the user's desktop.
-
-Install-ADK
-Runs the ADK installer with specific options.
-
-📂 Output
-ADK files will be copied to:
-
-%USERPROFILE%\Desktop\ADK
-If a matching vetted folder or ADK setup is not found, the script will notify the user.
+   1. Open PowerShell as Administrator.
+   2. Run the script:
+    ```powershell
+    .\ModernStandby_Setup.PS1
+   
+   🧩 Script Breakdown
+   Get-OSBuild
+   Retrieves the current Windows OS build number.
+   
+   Find-MatchingVettingFolder
+   Searches the vetting root directory for a folder that matches the OS build number.
+   
+   Copy-ADKFiles
+   Copies the ADK files from the vetted folder to the user's desktop.
+   
+   Install-ADK
+   Runs the ADK installer with specific options.
+   
+   📂 Output
+   ADK files will be copied to:
+   
+   %USERPROFILE%\Desktop\ADK
+   If a matching vetted folder or ADK setup is not found, the script will notify the user.
 
 
 

@@ -4,79 +4,94 @@ $logFile = Join-Path $desktopPath "IntelPep_Integration_Log.txt"
 $secondPart1Path = Join-Path $desktopPath "SecondPart1.ps1"
 $secondPart2Path = Join-Path $desktopPath "SecondPart2.ps1"
 $taskName1 = "IntelPep_SecondPart1"
+$taskName2 = "IntelPep_SecondPart2"
+$networkBasePath = "\\wosext3.amr.corp.intel.com\Users\nsadanax"
+$disableScriptPath = "C:\disable.cmd"
+$debugHostIP = "10.241.106.152"
+$debugPort = "50828"
+$debugKey = "1.2.3.4"
 
-function Log {
+# === UTILITY FUNCTIONS ===
+function Log-Message {
     param([string]$message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path $logFile -Value "$timestamp - $message"
 }
 
-function Copy-Folders {
+function Get-LatestIntelpepPath {
     try {
-        Log "Copying fre and Changing_Binaries folders to Desktop..."
-        Copy-Item -Path "\\wosext3.amr.corp.intel.com\Users\nsadanax\fre" -Destination $desktopPath -Recurse -Force
-        Copy-Item -Path "\\wosext3.amr.corp.intel.com\Users\nsadanax\Changing_Binaries" -Destination $desktopPath -Recurse -Force
-        Log "Folders copied successfully."
+        Get-ChildItem -Path "C:\Windows\System32\DriverStore\FileRepository" -Recurse -Filter "intelpep.sys" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
     } catch {
-        Log "Error copying folders: $_"
+        Log-Message "Error locating intelpep.sys: $_"
+        return $null
+    }
+}
+
+# === CORE FUNCTIONS ===
+function Copy-RequiredFolders {
+    try {
+        Log-Message "Copying required folders to Desktop..."
+        Copy-Item -Path (Join-Path $networkBasePath "fre") -Destination $desktopPath -Recurse -Force
+        Copy-Item -Path (Join-Path $networkBasePath "Changing_Binaries") -Destination $desktopPath -Recurse -Force
+        Log-Message "Folders copied successfully."
+    } catch {
+        Log-Message "Error copying folders: $_"
         throw
     }
 }
 
-function Replace-Intelpep {
+function Replace-IntelpepFile {
     param([string]$platform)
     if ($platform -ne "PTLH-MS") {
-        try {
-            Log "Searching for latest intelpep.sys in DriverStore..."
-            $intelpepPath = Get-ChildItem -Path "C:\Windows\System32\DriverStore\FileRepository" -Recurse -Filter "intelpep.sys" -ErrorAction Stop |
-                            Sort-Object LastWriteTime -Descending |
-                            Select-Object -First 1 -ExpandProperty FullName
-
-            if ($intelpepPath) {
-                Log "Found intelpep.sys at: $intelpepPath"
+        $intelpepPath = Get-LatestIntelpepPath
+        if ($intelpepPath) {
+            try {
+                Log-Message "Replacing intelpep.sys in local folders..."
                 Copy-Item -Path $intelpepPath -Destination (Join-Path $desktopPath "fre\intelpep.sys") -Force
                 Copy-Item -Path $intelpepPath -Destination (Join-Path $desktopPath "Changing_Binaries\intelpep.sys") -Force
-                Log "intelpep.sys replaced in both folders."
-            } else {
-                Log "intelpep.sys not found in DriverStore."
+                Log-Message "intelpep.sys replaced successfully."
+            } catch {
+                Log-Message "Error copying intelpep.sys: $_"
+                throw
             }
-        } catch {
-            Log "Error replacing intelpep.sys: $_"
-            throw
+        } else {
+            Log-Message "intelpep.sys not found."
         }
     } else {
-        Log "No replacement needed for PTLH-MS."
+        Log-Message "No replacement needed for PTLH-MS."
     }
 }
 
-function Setup-Debugger {
+function Configure-Debugger {
     try {
-        Log "Setting debugger settings..."
-        bcdedit /dbgsettings net hostip:10.241.106.152 port:50828 key:1.2.3.4
+        Log-Message "Configuring debugger settings..."
+        bcdedit /dbgsettings net hostip:$debugHostIP port:$debugPort key:$debugKey
     } catch {
-        Log "Error setting debugger settings: $_"
+        Log-Message "Error configuring debugger: $_"
         throw
     }
 }
 
-function Run-DisableCmd {
+function Run-DisableScript {
     try {
-        Log "Running disable.cmd..."
-        Start-Process "cmd.exe" -ArgumentList "/c C:\disable.cmd" -Wait
-        Log "disable.cmd completed."
+        Log-Message "Running disable.cmd..."
+        Start-Process "cmd.exe" -ArgumentList "/c $disableScriptPath" -Wait
+        Log-Message "disable.cmd completed."
     } catch {
-        Log "Error running disable.cmd: $_"
+        Log-Message "Error running disable.cmd: $_"
         throw
     }
 }
 
-function Create-SecondPart1 {
+function Create-SecondPart1Script {
     try {
         $script = @"
 `$desktopPath = [Environment]::GetFolderPath('Desktop')
 `$logFile = Join-Path `$desktopPath 'IntelPep_Integration_Log.txt'
 `$secondScriptPath = Join-Path `$desktopPath 'SecondPart2.ps1'
-`$taskName2 = 'IntelPep_SecondPart2'
+`$taskName2 = '$taskName2'
 
 function Log {
     param([string]`$message)
@@ -85,11 +100,10 @@ function Log {
 }
 
 Log \"Running SecondPart1.ps1...\"
-
 bcdedit /debug on
 Log \"Debugging enabled.\"
 
-`$action2 = New-ScheduledTaskAction -Execute \"powershell.exe\" -Argument \"-ExecutionPolicy Bypass -File `\"`$secondScriptPath`\"\"
+`$action2 = New-ScheduledTaskAction -Execute \"powershell.exe\" -Argument \"-ExecutionPolicy Bypass -File `\"`$secondScriptPath`\"\""
 `$trigger2 = New-ScheduledTaskTrigger -AtStartup
 Register-ScheduledTask -TaskName `$taskName2 -Action `$action2 -Trigger `$trigger2 -RunLevel Highest -Force
 Log \"Scheduled task '`$taskName2' created.\"
@@ -98,14 +112,14 @@ Log \"Rebooting system to continue integration...\"
 Restart-Computer -Force
 "@
         $script | Out-File -FilePath $secondPart1Path -Encoding UTF8
-        Log "SecondPart1.ps1 created."
+        Log-Message "SecondPart1.ps1 created."
     } catch {
-        Log "Error creating SecondPart1.ps1: $_"
+        Log-Message "Error creating SecondPart1.ps1: $_"
         throw
     }
 }
 
-function Create-SecondPart2 {
+function Create-SecondPart2Script {
     try {
         $script = @"
 `$desktopPath = [Environment]::GetFolderPath('Desktop')
@@ -118,7 +132,6 @@ function Log {
 }
 
 Log \"Running SecondPart2.ps1...\"
-
 bcdedit -set testsigning on
 Log \"Test signing enabled.\"
 
@@ -149,49 +162,51 @@ if (Test-Path \"C:\windows\system32\drivers\intelpep.sys\") {
 bcdedit /debug off
 Log \"Debugging disabled.\"
 
-Unregister-ScheduledTask -TaskName \"IntelPep_SecondPart1\" -Confirm:\$false
-Unregister-ScheduledTask -TaskName \"IntelPep_SecondPart2\" -Confirm:\$false
+Unregister-ScheduledTask -TaskName \"$taskName1\" -Confirm:\$false
+Unregister-ScheduledTask -TaskName \"$taskName2\" -Confirm:\$false
 Log \"Scheduled tasks removed.\"
 
 Log \"Final rebooting system...\"
 Restart-Computer -Force
 "@
         $script | Out-File -FilePath $secondPart2Path -Encoding UTF8
-        Log "SecondPart2.ps1 created."
+        Log-Message "SecondPart2.ps1 created."
     } catch {
-        Log "Error creating SecondPart2.ps1: $_"
+        Log-Message "Error creating SecondPart2.ps1: $_"
         throw
     }
 }
 
-function Schedule-SecondPart1 {
+function Schedule-SecondPart1Task {
     try {
-        Log "Creating scheduled task for SecondPart1.ps1..."
-        $action1 = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$secondPart1Path`""
-        $trigger1 = New-ScheduledTaskTrigger -AtStartup
-        Register-ScheduledTask -TaskName $taskName1 -Action $action1 -Trigger $trigger1 -RunLevel Highest -Force
-        Log "Scheduled task '$taskName1' created."
+        Log-Message "Scheduling SecondPart1.ps1..."
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$secondPart1Path`""
+        $trigger = New-ScheduledTaskTrigger -AtStartup
+        Register-ScheduledTask -TaskName $taskName1 -Action $action -Trigger $trigger -RunLevel Highest -Force
+        Log-Message "Scheduled task '$taskName1' created."
     } catch {
-        Log "Error scheduling SecondPart1.ps1: $_"
+        Log-Message "Error scheduling SecondPart1.ps1: $_"
         throw
     }
 }
 
-function Main {
+# === MAIN WORKFLOW ===
+function Start-IntelPepIntegration {
     try {
-        Copy-Folders
+        Copy-RequiredFolders
         $platform = Read-Host "Enter platform (PTLH-MS, ARLH-MS, ARLU-MS, LNL-MS)"
-        Replace-Intelpep -platform $platform
-        Setup-Debugger
-        Run-DisableCmd
-        Create-SecondPart1
-        Create-SecondPart2
-        Schedule-SecondPart1
-        Log "Rebooting system to begin integration..."
+        Replace-IntelpepFile -platform $platform
+        Configure-Debugger
+        Run-DisableScript
+        Create-SecondPart1Script
+        Create-SecondPart2Script
+        Schedule-SecondPart1Task
+        Log-Message "Rebooting system to begin integration..."
         Restart-Computer -Force
     } catch {
-        Log "Script failed: $_"
+        Log-Message "Integration process failed: $_"
     }
 }
 
-Main
+# === EXECUTE ===
+Start-IntelPepIntegration

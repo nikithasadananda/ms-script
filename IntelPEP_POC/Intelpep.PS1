@@ -87,92 +87,98 @@ function Run-DisableScript {
 
 function Create-SecondPart1Script {
     try {
-        $script = @"
-`$desktopPath = [Environment]::GetFolderPath('Desktop')
-`$logFile = Join-Path `$desktopPath 'IntelPep_Integration_Log.txt'
-`$secondScriptPath = Join-Path `$desktopPath 'SecondPart2.ps1'
-`$taskName2 = '$taskName2'
+        $script = @'
+$desktopPath = [Environment]::GetFolderPath('Desktop')
+$logFile = Join-Path $desktopPath 'IntelPep_Integration_Log.txt'
+$secondScriptPath = Join-Path $desktopPath 'SecondPart2.ps1'
+$taskName2 = 'IntelPep_SecondPart2'
 
 function Log {
-    param([string]`$message)
-    `$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Add-Content -Path `$logFile -Value \"`$timestamp - `$message\"
+    param([string]$message)
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path $logFile -Value "$timestamp - $message"
 }
 
-Log \"Running SecondPart1.ps1...\"
-bcdedit /debug on
-Log \"Debugging enabled.\"
+try {
+    Log "Running SecondPart1.ps1..."
+    bcdedit /debug on
+    Log "Debugging enabled."
 
-`$action2 = New-ScheduledTaskAction -Execute \"powershell.exe\" -Argument \"-ExecutionPolicy Bypass -File `\"`$secondScriptPath`\"\""
-`$trigger2 = New-ScheduledTaskTrigger -AtStartup
-Register-ScheduledTask -TaskName `$taskName2 -Action `$action2 -Trigger `$trigger2 -RunLevel Highest -Force
-Log \"Scheduled task '`$taskName2' created.\"
+    $action2 = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -File `"$secondScriptPath`""
+    $trigger2 = New-ScheduledTaskTrigger -AtStartup
+    Register-ScheduledTask -TaskName $taskName2 -Action $action2 -Trigger $trigger2 -RunLevel Highest -Force
+    Log "Scheduled task '$taskName2' created."
 
-Log \"Rebooting system to continue integration...\"
-Restart-Computer -Force
-"@
+    Log "Rebooting system to continue integration..."
+    Restart-Computer -Force
+} catch {
+    Log "Error in SecondPart1.ps1: $_"
+}
+'@
         $script | Out-File -FilePath $secondPart1Path -Encoding UTF8
-        Log-Message "SecondPart1.ps1 created."
+        Log-Message "Corrected SecondPart1.ps1 created successfully."
     } catch {
-        Log-Message "Error creating SecondPart1.ps1: $_"
+        Log-Message "Error creating corrected SecondPart1.ps1: $_"
         throw
     }
 }
 
 function Create-SecondPart2Script {
     try {
-        $script = @"
-`$desktopPath = [Environment]::GetFolderPath('Desktop')
-`$logFile = Join-Path `$desktopPath 'IntelPep_Integration_Log.txt'
+        $script = @'
+$desktopPath = [Environment]::GetFolderPath('Desktop')
+$logFile = Join-Path $desktopPath 'IntelPep_Integration_Log.txt'
+$taskName1 = 'IntelPep_SecondPart1'
+$taskName2 = 'IntelPep_SecondPart2'
 
 function Log {
-    param([string]`$message)
-    `$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Add-Content -Path `$logFile -Value \"`$timestamp - `$message\"
+    param([string]$message)
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path $logFile -Value "$timestamp - $message"
 }
 
-Log \"Running SecondPart2.ps1...\"
-bcdedit -set testsigning on
-Log \"Test signing enabled.\"
+try {
+    Log "Running SecondPart2.ps1..."
 
-bcdedit -set nointegritychecks on
-Log \"No integrity checks enabled.\"
+    bcdedit -set testsigning on
+    Log "Test signing enabled."
 
-bcdedit -set advancedoptions on
-Log \"Advanced boot options enabled.\"
+    bcdedit -set nointegritychecks on
+    Log "No integrity checks enabled."
 
-Start-Process \"sfpcopy_new.exe\" -ArgumentList \"intelpep.sys intelpep.inf:intelpep.sys\" -Wait
-Log \"sfpcopy_new.exe completed.\"
+    bcdedit -set advancedoptions on
+    Log "Advanced boot options enabled."
 
-Start-Process \"sfpcopy.exe\" -ArgumentList \"intelpep.sys C:\windows\system32\drivers\intelpep.sys\" -Wait
-Log \"sfpcopy.exe completed.\"
+    Start-Process "sfpcopy_new.exe" -ArgumentList "intelpep.sys intelpep.inf:intelpep.sys" -Wait
+    Log "sfpcopy_new.exe completed."
 
-Log \"Rebooting system after copy...\"
-Restart-Computer -Force
+    Start-Process "sfpcopy.exe" -ArgumentList "intelpep.sys C:\windows\system32\drivers\intelpep.sys" -Wait
+    Log "sfpcopy.exe completed."
 
-Start-Sleep -Seconds 10
+    Log "Verifying intelpep.sys is copied..."
+    if (Test-Path "C:\windows\system32\drivers\intelpep.sys") {
+        Log "intelpep.sys successfully copied to system32\\drivers."
+    } else {
+        Log "intelpep.sys not found in system32\\drivers."
+    }
 
-Log \"Verifying intelpep.sys is copied...\"
-if (Test-Path \"C:\windows\system32\drivers\intelpep.sys\") {
-    Log \"intelpep.sys successfully copied to system32\\drivers.\"
-} else {
-    Log \"intelpep.sys not found in system32\\drivers.\"
+    bcdedit /debug off
+    Log "Debugging disabled."
+
+    Unregister-ScheduledTask -TaskName $taskName1 -Confirm:$false
+    Unregister-ScheduledTask -TaskName $taskName2 -Confirm:$false
+    Log "Scheduled tasks removed."
+
+    Log "Rebooting system after integration..."
+    Restart-Computer -Force
+} catch {
+    Log "Error in SecondPart2.ps1: $_"
 }
-
-bcdedit /debug off
-Log \"Debugging disabled.\"
-
-Unregister-ScheduledTask -TaskName \"$taskName1\" -Confirm:\$false
-Unregister-ScheduledTask -TaskName \"$taskName2\" -Confirm:\$false
-Log \"Scheduled tasks removed.\"
-
-Log \"Final rebooting system...\"
-Restart-Computer -Force
-"@
+'@
         $script | Out-File -FilePath $secondPart2Path -Encoding UTF8
-        Log-Message "SecondPart2.ps1 created."
+        Log-Message "Corrected SecondPart2.ps1 created successfully."
     } catch {
-        Log-Message "Error creating SecondPart2.ps1: $_"
+        Log-Message "Error creating corrected SecondPart2.ps1: $_"
         throw
     }
 }

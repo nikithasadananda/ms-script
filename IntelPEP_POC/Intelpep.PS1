@@ -21,7 +21,7 @@ function Safe-Copy {
         Copy-Item -Path $source -Destination $destination -Recurse -Force
         Log-Message "Copied from $source to $destination"
     } catch {
-        Log-Message "ERROR copying from $source to $destination: $_"
+        Log-Message "ERROR copying from ${source} to ${destination}: $_"
         throw
     }
 }
@@ -60,36 +60,56 @@ Log-Message "Starting IntelPep Integration Script"
 $platform = Get-Content -Path $platformFile -Raw
 
 if ($platform -eq "PTLH-MS") {
-    # Step 1: Copy from network
     Safe-Copy "$networkBasePath\fre" $frePath
     Safe-Copy "$networkBasePath\Changing_Binaries" $changingPath
-
-    # Step 2: Copy Changing_Binaries to System32
     Safe-Copy $changingPath "$system32\Changing_Binaries"
-
-    # Step 3: Copy intelpep.sys to drivers
     Safe-Copy "$frePath\intelpep.sys" "$drivers\intelpep.sys"
-
 } elseif ($platform -eq "LNL-MR" -or $platform -eq "ARL-H" -or $platform -eq "ARL-U MS") {
-    # Step 1: Copy from network
     Safe-Copy "$networkBasePath\fre" $frePath
     Safe-Copy "$networkBasePath\Changing_Binaries" $changingPath
-
-    # Step 2: Find latest intelpep.sys
     $latestIntelPep = Find-LatestIntelPep
-
-    # Step 3: Replace in Desktop folders
     Safe-Copy $latestIntelPep "$frePath\intelpep.sys"
     Safe-Copy $latestIntelPep "$changingPath\intelpep.sys"
-
-    # Step 4: Copy Changing_Binaries to System32
     Safe-Copy $changingPath "$system32\Changing_Binaries"
-
-    # Step 5: Copy intelpep.sys to drivers
     Safe-Copy $latestIntelPep "$drivers\intelpep.sys"
 }
 
-# Step 6: Run bcdedit commands
+# Step: Configure debugger settings
+try {
+    Invoke-Expression "bcdedit /dbgsettings net hostip:10.241.106.152 port:50828 key:1.2.3.4"
+    Log-Message "Executed: bcdedit /dbgsettings"
+} catch {
+    Log-Message "ERROR running dbgsettings: $_"
+    exit
+}
+
+# Step: Run disable.cmd with exit code check
+try {
+    cd C:\
+    $exitCode = (Start-Process "cmd.exe" -ArgumentList "/c C:\disable.cmd" -Wait -PassThru).ExitCode
+    if ($exitCode -ne 0) {
+        throw "disable.cmd exited with code $exitCode"
+    }
+    Log-Message "Executed: disable.cmd"
+} catch {
+    Log-Message "ERROR running disable.cmd: $_"
+    exit
+}
+
+Write-Host "Press any key to reboot..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Restart-Computer -Force
+
+# After reboot: Enable debugging
+try {
+    Invoke-Expression "bcdedit /debug on"
+    Log-Message "Executed: bcdedit /debug on"
+} catch {
+    Log-Message "ERROR running bcdedit /debug on: $_"
+    exit
+}
+
+# Continue with boot options
 Run-BCDCommands
 
 Log-Message "IntelPep Integration Script completed"

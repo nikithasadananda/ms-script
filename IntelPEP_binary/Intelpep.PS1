@@ -1,5 +1,7 @@
+# Stop execution on any error
 $ErrorActionPreference = "Stop"
 
+# === Configuration ===
 $logFile = "$env:USERPROFILE\Desktop\IntelPepIntegration_Log.txt"
 $platformFile = "$env:USERPROFILE\Desktop\platform.txt"
 $networkBasePath = "\\wosext3.amr.corp.intel.com\Users\nsadanax"
@@ -8,24 +10,28 @@ $changingPath = "$env:USERPROFILE\Desktop\Changing_Binaries"
 $driverStore = "C:\Windows\System32\DriverStore\FileRepository"
 $system32 = "C:\Windows\System32"
 $drivers = "$system32\drivers"
+$disableCmd = "C:\disable.cmd"
 
+# === Logging Function ===
 function Log-Message {
     param([string]$message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path $logFile -Value "$timestamp - $message"
 }
 
+# === Safe Copy Function with Logging and Error Handling ===
 function Safe-Copy {
     param($source, $destination)
     try {
         Copy-Item -Path $source -Destination $destination -Recurse -Force
         Log-Message "Copied from $source to $destination"
     } catch {
-        Log-Message "ERROR copying from ${source} to ${destination}: $_"
+        Log-Message "ERROR copying from $source to $destination: $_"
         throw
     }
 }
 
+# === Find the Most Recent intelpep.sys in DriverStore ===
 function Find-LatestIntelPep {
     $intelpep = Get-ChildItem -Path $driverStore -Recurse -Filter "intelpep.sys" |
                 Sort-Object LastWriteTime -Descending |
@@ -37,6 +43,7 @@ function Find-LatestIntelPep {
     return $intelpep.FullName
 }
 
+# === Configure Boot Options for Debugging ===
 function Run-BCDCommands {
     $commands = @(
         "bcdedit -set testsigning on",
@@ -53,18 +60,20 @@ function Run-BCDCommands {
     }
 }
 
-# Start Script
-Log-Message "Starting IntelPep Integration Script"
+# === Main Script Execution Starts Here ===
+Log-Message "===== Starting IntelPep Integration Script ====="
 
-# Read platform from platform.txt
+# Read platform name from file
 $platform = Get-Content -Path $platformFile -Raw
+Log-Message "Detected platform: $platform"
 
+# Perform platform-specific file operations
 if ($platform -eq "PTLH-MS") {
     Safe-Copy "$networkBasePath\fre" $frePath
     Safe-Copy "$networkBasePath\Changing_Binaries" $changingPath
     Safe-Copy $changingPath "$system32\Changing_Binaries"
     Safe-Copy "$frePath\intelpep.sys" "$drivers\intelpep.sys"
-} elseif ($platform -eq "LNL-MR" -or $platform -eq "ARL-H" -or $platform -eq "ARL-U MS") {
+} elseif ($platform -in @("LNL-MR", "ARL-H", "ARL-U MS")) {
     Safe-Copy "$networkBasePath\fre" $frePath
     Safe-Copy "$networkBasePath\Changing_Binaries" $changingPath
     $latestIntelPep = Find-LatestIntelPep
@@ -72,9 +81,12 @@ if ($platform -eq "PTLH-MS") {
     Safe-Copy $latestIntelPep "$changingPath\intelpep.sys"
     Safe-Copy $changingPath "$system32\Changing_Binaries"
     Safe-Copy $latestIntelPep "$drivers\intelpep.sys"
+} else {
+    Log-Message "Unsupported platform: $platform"
+    exit
 }
 
-# Step: Configure debugger settings
+# Configure debugger settings
 try {
     Invoke-Expression "bcdedit /dbgsettings net hostip:10.241.106.152 port:50828 key:1.2.3.4"
     Log-Message "Executed: bcdedit /dbgsettings"
@@ -83,10 +95,10 @@ try {
     exit
 }
 
-# Step: Run disable.cmd with exit code check
+# Run disable.cmd and check for success
 try {
     cd C:\
-    $exitCode = (Start-Process "cmd.exe" -ArgumentList "/c C:\disable.cmd" -Wait -PassThru).ExitCode
+    $exitCode = (Start-Process "cmd.exe" -ArgumentList "/c $disableCmd" -Wait -PassThru).ExitCode
     if ($exitCode -ne 0) {
         throw "disable.cmd exited with code $exitCode"
     }
@@ -96,11 +108,14 @@ try {
     exit
 }
 
+# Prompt user before rebooting
 Write-Host "Press any key to reboot..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 Restart-Computer -Force
 
-# After reboot: Enable debugging
+# === Post-Reboot Actions ===
+
+# Enable debugging
 try {
     Invoke-Expression "bcdedit /debug on"
     Log-Message "Executed: bcdedit /debug on"
@@ -109,7 +124,7 @@ try {
     exit
 }
 
-# Continue with boot options
+# Apply additional boot configuration
 Run-BCDCommands
 
-Log-Message "IntelPep Integration Script completed"
+Log-Message "===== IntelPep Integration Script completed ====="

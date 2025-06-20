@@ -1,5 +1,5 @@
 @echo off
-:: RS_AH_Validation_5pct_3.5hrs.cmd
+:: RS_AH_Validation_5p_3.5hrs.cmd
 
 :: Check for admin rights
 NET FILE 1>NUL 2>NUL

@@ -1,34 +1,35 @@
 param (
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
+    [ValidateScript({ Test-Path $_ })]
     [string]$IncomingRoot,  # Root path to the Incoming folder
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$DestinationDir,  # Where to extract the .bin file
 
-    [string]$SearchString = "PTL_PR01_XXXX-XXXODCA_CPRF_SED5_01E50692"  # Pattern to match in .bin filename
+    [string]$SearchString = "PTL_PR01_XXXX-XXXODCA_CPRF_SED5_01E50692",  # Pattern to match in .bin filename
+
+    [string]$BspFilter = "*",  # Optional: filter BSP folder names
+    [string]$ZipFilter = "IFWI_PTLH_A0B0_PSPP_Release_*.zip"  # Optional: filter zip file names
 )
 
-# Function to get the most recently modified BSP folder
 function Get-LatestBspFolder {
-    param ([string]$RootPath)
+    param ([string]$RootPath, [string]$Filter)
 
-    # List all directories, sort by last modified time, and return the latest one
-    Get-ChildItem -Path $RootPath -Directory |
+    # Get the latest BSP folder matching the filter
+    Get-ChildItem -Path $RootPath -Directory -Filter $Filter |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
 }
 
-# Function to get the latest IFWI zip file from the Packages folder
 function Get-LatestIfwiZip {
-    param ([string]$PackagesPath)
+    param ([string]$PackagesPath, [string]$Filter)
 
-    # Look for zip files matching the IFWI naming pattern and return the latest one
-    Get-ChildItem -Path $PackagesPath -Filter "IFWI_PTLH_A0B0_PSPP_Release_*.zip" |
+    # Get the latest IFWI zip file matching the filter
+    Get-ChildItem -Path $PackagesPath -Filter $Filter |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
 }
 
-# Function to extract the .bin file matching the search string from the zip
 function Extract-BinFromZip {
     param (
         [string]$ZipPath,
@@ -36,30 +37,34 @@ function Extract-BinFromZip {
         [string]$MatchString
     )
 
-    # Load .NET compression library
     Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-    # Create destination directory if it doesn't exist
     if (-not (Test-Path $Destination)) {
         New-Item -ItemType Directory -Path $Destination | Out-Null
     }
 
-    # Open the zip file for reading
-    $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try {
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+    } catch {
+        Write-Host "Error opening zip file: $_"
+        return
+    }
+
     $found = $false
 
-    # Loop through each entry in the zip
     foreach ($entry in $zip.Entries) {
-        # Check if the entry name contains the search string and ends with .bin
         if ($entry.FullName -like "*$MatchString*.bin") {
             $outputPath = Join-Path $Destination $entry.Name
-            $entry.ExtractToFile($outputPath, $true)
-            Write-Host "Extracted: $($entry.FullName) to $outputPath"
-            $found = $true
+            try {
+                $entry.ExtractToFile($outputPath, $true)
+                Write-Host "Extracted: $($entry.FullName) to $outputPath"
+                $found = $true
+            } catch {
+                Write-Host "Failed to extract $($entry.FullName): $_"
+            }
         }
     }
 
-    # Close the zip file
     $zip.Dispose()
 
     if (-not $found) {
@@ -67,24 +72,23 @@ function Extract-BinFromZip {
     }
 }
 
-# Main script execution 
+# Main Execution Flow
 
-# Step 1: Get the latest BSP folder
-$latestBsp = Get-LatestBspFolder -RootPath $IncomingRoot
+Write-Host "Searching for latest BSP folder in: $IncomingRoot"
+$latestBsp = Get-LatestBspFolder -RootPath $IncomingRoot -Filter $BspFilter
 if (-not $latestBsp) {
-    Write-Host "No BSP folders found in $IncomingRoot"
+    Write-Host "No BSP folders found matching filter '$BspFilter' in $IncomingRoot"
     exit
 }
 Write-Host "Latest BSP folder: $($latestBsp.Name)"
 
-# Step 2: Get the latest IFWI zip file from the Packages subfolder
 $packagesPath = Join-Path $latestBsp.FullName "Packages"
-$latestZip = Get-LatestIfwiZip -PackagesPath $packagesPath
+Write-Host "Looking for IFWI zip in: $packagesPath"
+$latestZip = Get-LatestIfwiZip -PackagesPath $packagesPath -Filter $ZipFilter
 if (-not $latestZip) {
-    Write-Host "No IFWI zip files found in $packagesPath"
+    Write-Host "No IFWI zip files found matching filter '$ZipFilter' in $packagesPath"
     exit
 }
 Write-Host "Latest IFWI zip: $($latestZip.Name)"
 
-# Step 3: Extract the matching .bin file
 Extract-BinFromZip -ZipPath $latestZip.FullName -Destination $DestinationDir -MatchString $SearchString
